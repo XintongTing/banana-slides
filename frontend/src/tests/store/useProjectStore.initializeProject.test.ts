@@ -14,11 +14,6 @@ const mockGetProject = vi.fn()
 const mockAssociateFileToProject = vi.fn()
 const mockUploadTemplate = vi.fn()
 const mockGenerateFromDescription = vi.fn()
-const mockGenerateFromDescriptionTask = vi.fn()
-const mockGenerateOutline = vi.fn()
-const mockGenerateOutlineTask = vi.fn()
-const mockGetTaskStatus = vi.fn()
-const mockDeleteProject = vi.fn()
 
 vi.mock('@/api/endpoints', () => ({
   createProject: (...args: any[]) => {
@@ -41,32 +36,14 @@ vi.mock('@/api/endpoints', () => ({
     callOrder.push('generateFromDescription')
     return mockGenerateFromDescription(...args)
   },
-  generateFromDescriptionTask: (...args: any[]) => {
-    callOrder.push('generateFromDescriptionTask')
-    return mockGenerateFromDescriptionTask(...args)
-  },
-  generateOutline: (...args: any[]) => {
-    callOrder.push('generateOutline')
-    return mockGenerateOutline(...args)
-  },
-  generateOutlineTask: (...args: any[]) => {
-    callOrder.push('generateOutlineTask')
-    return mockGenerateOutlineTask(...args)
-  },
-  getTaskStatus: (...args: any[]) => {
-    callOrder.push('getTaskStatus')
-    return mockGetTaskStatus(...args)
-  },
-  deleteProject: (...args: any[]) => {
-    callOrder.push('deleteProject')
-    return mockDeleteProject(...args)
-  },
   // Other mocks needed by the store
   updatePage: vi.fn(),
   updatePageDescription: vi.fn(),
   updatePageOutline: vi.fn(),
+  generateOutline: vi.fn(),
   generateDescriptions: vi.fn(),
   generateImages: vi.fn(),
+  getTaskStatus: vi.fn(),
   exportPPTX: vi.fn(),
   exportPDF: vi.fn(),
   getStoredOutputLanguage: vi.fn().mockResolvedValue('zh'),
@@ -99,12 +76,6 @@ describe('initializeProject - reference file association', () => {
     })
     mockUploadTemplate.mockResolvedValue({ data: {} })
     mockGenerateFromDescription.mockResolvedValue({ data: {} })
-    mockGenerateFromDescriptionTask.mockResolvedValue({ data: { task_id: 'task-desc' } })
-    mockGenerateOutline.mockResolvedValue({ data: {} })
-    mockGenerateOutlineTask.mockResolvedValue({ data: { task_id: 'task-outline' } })
-    mockGetTaskStatus.mockResolvedValue({ data: { task_id: 'task-outline', status: 'COMPLETED' } })
-    mockDeleteProject.mockResolvedValue({ data: {} })
-    localStorage.clear()
 
     // Reset store
     const { result } = renderHook(() => useProjectStore())
@@ -146,40 +117,13 @@ describe('initializeProject - reference file association', () => {
       )
     })
 
-    // Verify call order: create → associate → async generate
+    // Verify call order: create → associate → generate
     const createIdx = callOrder.indexOf('createProject')
     const associateIdx = callOrder.indexOf('associateFileToProject')
-    const generateIdx = callOrder.indexOf('generateFromDescriptionTask')
+    const generateIdx = callOrder.indexOf('generateFromDescription')
 
     expect(createIdx).toBeLessThan(associateIdx)
     expect(associateIdx).toBeLessThan(generateIdx)
-  })
-
-  it('should start async outline generation and poll instead of calling the long sync endpoint', async () => {
-    const { result } = renderHook(() => useProjectStore())
-
-    await act(async () => {
-      await result.current.initializeProject('outline', 'Slide 1\n- Point')
-    })
-
-    expect(mockGenerateOutlineTask).toHaveBeenCalledWith('proj-001')
-    expect(mockGenerateOutline).not.toHaveBeenCalled()
-    expect(mockGetTaskStatus).toHaveBeenCalledWith('proj-001', 'task-outline')
-    expect(localStorage.getItem('currentProjectId')).toBe('proj-001')
-  })
-
-  it('should keep the project when async generation task startup fails', async () => {
-    mockGenerateOutlineTask.mockRejectedValueOnce(new Error('gateway timeout'))
-
-    const { result } = renderHook(() => useProjectStore())
-
-    await expect(
-      act(async () => {
-        await result.current.initializeProject('outline', 'Slide 1\n- Point')
-      })
-    ).rejects.toThrow('gateway timeout')
-
-    expect(mockDeleteProject).not.toHaveBeenCalled()
   })
 
   it('should not call associateFileToProject when no file IDs provided', async () => {
